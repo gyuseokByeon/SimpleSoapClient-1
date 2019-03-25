@@ -6,11 +6,13 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
+using SimpleSoapClient.Helpers;
+using SimpleSoapClient.Validators;
 using SoapClientLib;
 
 namespace SimpleSoapClient
 {
-	class Program
+	internal static class Program
 	{
 		/// <summary>
 		/// Can be run with arguments: -pass/to/xml, url, method, -parralel_sends_count (optional)
@@ -30,31 +32,14 @@ namespace SimpleSoapClient
 				Console.WriteLine(@"Usage example: text.xml https://somedomain.info:443/SomeService.svc Name.Space/SomeServise/ActionMethod 1");
 				return 1;
 			}
-			var xmlFilePath = args[0];
-			var requestUrl = args[1];
-			var actionUrl = args[2];
 
-			var parralelsCount = 1;
+			var parser = new ArgumentParser();
+			var cmdParams = parser.ParseArguments(args);
 
-			if (args.Count() == 4)
-			{
-				int.TryParse(args[3], out parralelsCount);
-			}
+			var validator = new ParamsValidator();
+			validator.Validate(cmdParams);
 
-
-			if (!File.Exists(xmlFilePath))
-			{
-				Console.WriteLine($"File not exists {xmlFilePath}");
-				Thread.Sleep(2000);
-				return 0;
-			}
-
-			var soapEnvelope = File.ReadAllText(xmlFilePath);
-
-			if (string.IsNullOrWhiteSpace(soapEnvelope))
-			{
-				throw new ArgumentNullException($"File {xmlFilePath} is empty");
-			}
+			var soapEnvelope = File.ReadAllText(cmdParams.XmlFilePath);
 
 			var client = new SoapWebClient();
 
@@ -62,13 +47,13 @@ namespace SimpleSoapClient
 
 			// todo define size
 
-			for (var x = 0; x < parralelsCount; x++)
+			for (var x = 0; x < cmdParams.ParralelThreadsCount; x++)
 			{
 				tasks.Add(new Task<SoapResult>(() =>
-					client.GetResponseSoap(requestUrl,actionUrl, soapEnvelope)));
+					client.GetResponseSoap(cmdParams.EndpointUrl, cmdParams.ActionUrl, soapEnvelope)));
 			}
 
-			tasks.ForEach(x=>x.Start());
+			tasks.ForEach(x => x.Start());
 
 			Task.WaitAll(tasks.ToArray());
 
